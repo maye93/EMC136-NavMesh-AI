@@ -1,44 +1,50 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.AI;
 
+[RequireComponent(typeof(NavMeshObstacle))]
 public class DoorMovement : MonoBehaviour
 {
     public bool isHorizontal = true;
-
-    private float moveDistance = 3f;
+    private float moveDistance = 2.5f;
     private float moveSpeed = 2f;
-
     private Vector3 initialPosition;
+    private NavMeshObstacle navMeshObstacle;
 
     void Start()
     {
-        // Save the initial position of the door
         initialPosition = transform.position;
-
-        // Start the movement coroutine
-        StartCoroutine(MoveDoor());
+        navMeshObstacle = GetComponent<NavMeshObstacle>();
+        StartCoroutine(MoveDoorContinuously());
     }
 
-    IEnumerator MoveDoor()
+    IEnumerator MoveDoorContinuously()
     {
         while (true)
         {
-            // Move left after 2 seconds
-            yield return new WaitForSeconds(2f);
+            StartCoroutine(MoveDoor(true)); // Close the door
+            yield return new WaitForSeconds(1.5f); // Wait for 3 seconds
+            StartCoroutine(MoveDoor(false));
+            yield return new WaitForSeconds(1.5f);
+        }
+    }
 
-            Vector3 targetPosition;
-            if (isHorizontal)
-                targetPosition = initialPosition - new Vector3(moveDistance, 0f, 0f);
-            else
-                targetPosition = initialPosition - new Vector3(0f, 0f, moveDistance);
+    IEnumerator MoveDoor(bool close)
+    {
+        Vector3 targetPosition = close ? initialPosition : initialPosition - new Vector3(0f, moveDistance, 0f);
 
-            StartCoroutine(MoveTo(targetPosition));
+        // Enable the NavMeshObstacle to block the NavMeshAgent
+        navMeshObstacle.enabled = close;
 
-            // Wait for 3 seconds
-            yield return new WaitForSeconds(3f);
+        StartCoroutine(MoveTo(targetPosition));
 
-            // Move back to the original position
-            StartCoroutine(MoveTo(initialPosition));
+        // Wait until the door reaches its target position
+        yield return new WaitUntil(() => Vector3.Distance(transform.position, targetPosition) < 0.01f);
+
+        // Disable the NavMeshObstacle to allow the NavMeshAgent to pass only when opening
+        if (!close)
+        {
+            navMeshObstacle.enabled = false;
         }
     }
 
@@ -46,7 +52,6 @@ public class DoorMovement : MonoBehaviour
     {
         while (Vector3.Distance(transform.position, targetPosition) > 0.01f)
         {
-            // Move the door towards the target position
             transform.position = Vector3.MoveTowards(transform.position, targetPosition, moveSpeed * Time.deltaTime);
             yield return null;
         }
